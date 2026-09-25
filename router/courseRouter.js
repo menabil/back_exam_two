@@ -7,7 +7,7 @@ const {
   deleteSingleCourseController,
   getCourseAtStudents,
 } = require("../controller/courseController");
-const router = express();
+const router = express.Router();
 
 router.post("/registration", registrationCourseController);
 router.get("/all/course", allCourseController);

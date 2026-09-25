@@ -1,56 +1,44 @@
 const mongoose = require("mongoose");
-let Course = require("../model/courseModel");
-let Student = require("../model/studentModel");
+const Course = require("../model/courseModel");
+const Student = require("../model/studentModel");
 
 const registrationCourseController = async (req, res) => {
   try {
     let { title, description, price, category, duration } = req.body;
 
     if (!title || !description || !price || !category || !duration) {
-      return res.status(400).json({
-        success: false,
-        message: "Please give all information",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Please give all information" });
     }
-
     if (price <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Please give a valid price",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Please give a valid price" });
     }
-
     if (duration < 1) {
-      return res.status(400).json({
-        success: false,
-        message: "Please give a long duration",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Please give a valid duration" });
     }
 
-    let exCourse = await Course.findOne({
-      title: title,
-      category: category,
-    });
-
+    let exCourse = await Course.findOne({ title: title, category: category });
     if (exCourse) {
-      return res.status(400).json({
-        success: false,
-        message: "Course already exist",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Course already exists" });
     }
 
-    let newCourse = await new Course({
-      title: title,
-      description: description,
-      price: price,
-      category: category,
-      duration: duration,
-    }).save();
-
-    return res.status(200).json({
-      success: true,
-      message: "New course created",
+    let newCourse = await Course.create({
+      title,
+      description,
+      price,
+      category,
+      duration,
     });
+    return res
+      .status(201)
+      .json({ success: true, message: "New course created", data: newCourse });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -62,7 +50,6 @@ const registrationCourseController = async (req, res) => {
 const allCourseController = async (req, res) => {
   try {
     let allCourse = await Course.find({});
-
     return res.status(200).json({
       success: true,
       message: `Total course: ${allCourse.length}`,
@@ -79,21 +66,22 @@ const allCourseController = async (req, res) => {
 const singleCourseController = async (req, res) => {
   try {
     let { id } = req.params;
-
-    let exCourse = await Course.findById({ _id: id });
-
-    if (!exCourse) {
-      return res.status(400).json({
-        success: false,
-        message: "Course not found",
-      });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid course id" });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Course details",
-      data: exCourse,
-    });
+    let exCourse = await Course.findById(id);
+    if (!exCourse) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Course not found" });
+    }
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Course details", data: exCourse });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -105,42 +93,47 @@ const singleCourseController = async (req, res) => {
 const updateSingleCourseController = async (req, res) => {
   try {
     let { id } = req.params;
-    let { title, description, price, category, duration } = req.body;
+    let { title, category, price, duration } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid course id",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid course id" });
     }
 
-    let exCourse = await Course.findOne({ title, category });
-
-    if (!exCourse) {
-      return res.status(400).json({
-        success: false,
-        message: "Course already exist",
-      });
+    if (price !== undefined && price <= 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please give a valid price" });
+    }
+    if (duration !== undefined && duration < 1) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please give a valid duration" });
     }
 
-    if (price <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Please give a valid price",
+    if (title && category) {
+      let exCourse = await Course.findOne({
+        title,
+        category,
+        _id: { $ne: id },
       });
+      if (exCourse) {
+        return res.status(400).json({
+          success: false,
+          message: "Course with this title and category already exists",
+        });
+      }
     }
 
-    if (duration < 1) {
-      return res.status(400).json({
-        success: false,
-        message: "Please give a long duration",
-      });
+    let updateCourse = await Course.findByIdAndUpdate(id, req.body, {
+      new: true,
+    });
+    if (!updateCourse) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Course not found" });
     }
-
-    let updateCourse = await Student.findByIdAndUpdate(
-      { _id: id },
-      { new: true },
-    );
 
     return res.status(200).json({
       success: true,
@@ -158,29 +151,22 @@ const updateSingleCourseController = async (req, res) => {
 const deleteSingleCourseController = async (req, res) => {
   try {
     let { id } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid course id",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid course id" });
     }
 
-    let exCourse = await Course.findById({ _id: id });
-
-    if (!exCourse) {
-      return res.status(400).json({
-        success: false,
-        message: "Course not found",
-      });
+    let deleteCourse = await Course.findByIdAndDelete(id);
+    if (!deleteCourse) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Course not found" });
     }
 
-    let deleteCourse = await Student.findByIdAndDelete({ _id: id });
-
-    return res.status(200).json({
-      success: true,
-      message: "Course no more",
-    });
+    return res
+      .status(200)
+      .json({ success: true, message: "Course deleted successfully" });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -192,31 +178,23 @@ const deleteSingleCourseController = async (req, res) => {
 const getCourseAtStudents = async (req, res) => {
   try {
     const { id } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid course id",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid course id" });
     }
 
     const exCourse = await Course.findById(id);
-
     if (!exCourse) {
-      return res.status(404).json({
-        success: false,
-        message: "Course not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Course not found" });
     }
 
-    const exStudent = await Student.find({ enrolledCourses: id });
-
-    return res.status(200).json({
-      success: true,
-      message: "Student fetched successfully",
-      count: exStudent.length,
-      data: exStudent,
-    });
+    const students = await Student.find({ enrolledCourses: id });
+    return res
+      .status(200)
+      .json({ success: true, count: students.length, data: students });
   } catch (error) {
     return res.status(500).json({
       success: false,

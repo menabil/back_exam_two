@@ -1,46 +1,40 @@
 const mongoose = require("mongoose");
-let Student = require("../model/studentModel");
-let Course = require("../model/courseModel");
+const Student = require("../model/studentModel");
+const Course = require("../model/courseModel");
 
 const registrationStudentController = async (req, res) => {
   try {
     let { name, email, phone, age, enrolledCourses } = req.body;
 
     if (!name || !email || !phone || !age) {
-      return res.status(400).json({
-        success: false,
-        message: "Please give all information",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Please give all information" });
+    }
+    if (age < 18) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Age must be 18 or above" });
     }
 
     let exUser = await Student.findOne({ email: email });
-
     if (exUser) {
       return res.status(400).json({
         success: false,
-        message: "Student already exist",
+        message: "Student with this email already exists",
       });
     }
 
-    if (age < 18) {
-      return res.status(400).json({
-        success: false,
-        message: "Age is too low",
-      });
-    }
-
-    let newUser = await new Student({
-      name: name,
-      email: email,
-      phone: phone,
-      age: age,
-      enrolledCourses: enrolledCourses,
-    }).save();
-
-    return res.status(200).json({
-      success: true,
-      message: "Student user created",
+    let newUser = await Student.create({
+      name,
+      email,
+      phone,
+      age,
+      enrolledCourses,
     });
+    return res
+      .status(201)
+      .json({ success: true, message: "Student created", data: newUser });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -52,14 +46,6 @@ const registrationStudentController = async (req, res) => {
 const allStudentController = async (req, res) => {
   try {
     let allStudent = await Student.find({});
-
-    if (!allStudent) {
-      return res.status(400).json({
-        success: false,
-        message: "Student not found",
-      });
-    }
-
     return res.status(200).json({
       success: true,
       message: `Total student: ${allStudent.length}`,
@@ -76,30 +62,22 @@ const allStudentController = async (req, res) => {
 const singleStudentController = async (req, res) => {
   try {
     let { id } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid student id",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid student id" });
     }
 
-    let exUser = await Student.findById({ _id: id }).populate(
-      "enrolledCourses",
-    );
-
+    let exUser = await Student.findById(id).populate("enrolledCourses");
     if (!exUser) {
-      return res.status(400).json({
-        success: false,
-        message: "User not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "User details",
-      data: exUser,
-    });
+    return res
+      .status(200)
+      .json({ success: true, message: "Student details", data: exUser });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -111,34 +89,33 @@ const singleStudentController = async (req, res) => {
 const updateSingleStudentController = async (req, res) => {
   try {
     let { id } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid student id",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid student id" });
     }
 
-    let exStudent = await Student.findOne({ email: req.body.email });
-
-    if (exStudent) {
-      return res.status(400).json({
-        success: false,
-        message: "Student already exist",
+    if (req.body.email) {
+      let exStudent = await Student.findOne({
+        email: req.body.email,
+        _id: { $ne: id },
       });
+      if (exStudent) {
+        return res.status(400).json({
+          success: false,
+          message: "Email already in use by another student",
+        });
+      }
+    }
+    if (req.body.age && req.body.age < 18) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Age must be 18 or above" });
     }
 
-    if (req.body.age < 18) {
-      return res.status(400).json({
-        success: false,
-        message: "Age is too low",
-      });
-    }
-
-    let updateStudent = await Student.findByIdAndUpdate({ _id: id }, req.body, {
+    let updateStudent = await Student.findByIdAndUpdate(id, req.body, {
       new: true,
     });
-
     return res.status(200).json({
       success: true,
       message: "Student data updated",
@@ -155,27 +132,30 @@ const updateSingleStudentController = async (req, res) => {
 const deleteSingleStudentController = async (req, res) => {
   try {
     let { id } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid student id" });
+    }
+
+    let exStudent = await Student.findById(id);
+    if (!exStudent) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
+    }
+    // Delete validation
+    if (exStudent.enrolledCourses && exStudent.enrolledCourses.length > 0) {
       return res.status(400).json({
         success: false,
-        message: "Invalid student id",
+        message: "Cannot delete. Student is already enrolled in courses.",
       });
     }
 
-    let deleteStudent = await Student.findByIdAndDelete({ _id: id });
-
-    if (updateStudent.enrolledCourses) {
-      return res.status(400).json({
-        success: false,
-        message: "Student already enrolled",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Student no more",
-    });
+    await Student.findByIdAndDelete(id);
+    return res
+      .status(200)
+      .json({ success: true, message: "Student deleted successfully" });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -191,54 +171,44 @@ const enrollStudentController = async (req, res) => {
       !mongoose.Types.ObjectId.isValid(studentId) ||
       !mongoose.Types.ObjectId.isValid(courseId)
     ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid student id",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid student or course id" });
     }
 
     const exStudent = await Student.findById(studentId);
-
-    if (!exStudent) {
-      return res.status(400).json({
-        success: false,
-        message: "Student not found",
-      });
-    }
+    if (!exStudent)
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
 
     const exCourse = await Course.findById(courseId);
-
-    if (!exCourse) {
-      return res.status(400).json({
-        success: false,
-        message: "Course not found",
-      });
-    }
+    if (!exCourse)
+      return res
+        .status(404)
+        .json({ success: false, message: "Course not found" });
 
     if (!exCourse.isPublished) {
       return res.status(400).json({
         success: false,
-        message: "Course not published",
+        message: "Cannot enroll. Course is not published yet.",
       });
     }
 
-    const isEnrolledStudent = exStudent.enrolledCourses.includes(courseId);
-
-    if (isEnrolledStudent) {
+    const isEnrolled = exStudent.enrolledCourses.includes(courseId);
+    if (isEnrolled) {
       return res.status(400).json({
         success: false,
-        message: "Course already exits",
+        message: "Student already enrolled in this course",
       });
     }
 
-    isEnrolledStudent.enrolledCourses.push(courseId);
+    exStudent.enrolledCourses.push(courseId);
+    await exStudent.save();
 
-    await isEnrolledStudent.save();
-
-    return res.status(200).json({
-      success: true,
-      message: "Course enrolled",
-    });
+    return res
+      .status(200)
+      .json({ success: true, message: "Course successfully enrolled" });
   } catch (error) {
     return res.status(500).json({
       success: false,
