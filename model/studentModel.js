@@ -23,7 +23,12 @@ const studentSchema = new Schema({
     type: Boolean,
     default: true,
   },
-  enrolledCourses: {},
+  enrolledCourses: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "Course",
+    },
+  ],
 });
 
-module.exports = mongoose.model("User", studentSchema);
+module.exports = mongoose.model("Student", studentSchema);
